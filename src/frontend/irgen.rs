@@ -146,7 +146,9 @@ impl IrGenContext {
                 | Bo::Le
                 | Bo::Ge
                 | Bo::Eq
-                | Bo::Ne => {
+                | Bo::Ne
+                | Bo::And
+                | Bo::Or => {
                     let lhs = self.gen_local_expr(lhs).unwrap(); // Generate lhs
                     let rhs = self.gen_local_expr(rhs).unwrap(); // Generate rhs
 
@@ -185,6 +187,12 @@ impl IrGenContext {
                         }
                         Bo::Ne => {
                             todo!("implement ne");
+                        }
+                        Bo::And => {
+                            todo!("implement and");
+                        }
+                        Bo::Or => {
+                            todo!("implement or");
                         }
                     };
 

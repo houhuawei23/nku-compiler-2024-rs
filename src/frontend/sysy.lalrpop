@@ -183,12 +183,14 @@ pub EqExp: Expr = {
 LAndExp: Expr = {
   EqExp => <>,
   // TODO: Support logical and operator
+  <lhs: LAndExp> "&&" <rhs: EqExp> => Expr::binary(BinaryOp::And, lhs, rhs),
 }
 
 // LOrExp -> LAndExp | LOrExp '||' LAndExp
 LOrExp: Expr = {
   LAndExp => <>,
   // TODO: Support logical or operator
+  <lhs: LOrExp> "||" <rhs: LAndExp> => Expr::binary(BinaryOp::Or, lhs, rhs),
 }
 
 // Exp -> AddExp

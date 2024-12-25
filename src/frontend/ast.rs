@@ -254,6 +254,8 @@ pub enum BinaryOp {
     Ge,  /* >= */
     Eq,  /* == */
     Ne,  /* != */
+    And, /* && */
+    Or,  /* || */
 }
 
 /// Unary operators.
@@ -715,7 +717,10 @@ impl VarDecl {
                     }
                 })
                 // TODO: assign undef
-                .unwrap_or_else(|| todo!("what if there is no init value?"));
+                .unwrap_or_else(|| {
+                    let undef = ComptimeVal::undef(ty.clone());
+                    Expr::const_(undef)
+                });
 
             def.init = Some(init);
 
@@ -852,6 +857,8 @@ impl Expr {
                     Bo::Ge => Some(ComptimeVal::bool(lhs >= rhs)),
                     Bo::Eq => Some(ComptimeVal::bool(lhs == rhs)),
                     Bo::Ne => Some(ComptimeVal::bool(lhs != rhs)),
+                    Bo::And => Some(lhs.logical_and(&rhs)),
+                    Bo::Or => Some(lhs.logical_or(&rhs)),
                 }
             }
             ExprKind::Unary(op, expr) => {
@@ -946,7 +953,9 @@ impl Expr {
                     | BinaryOp::Le
                     | BinaryOp::Ge
                     | BinaryOp::Eq
-                    | BinaryOp::Ne => {
+                    | BinaryOp::Ne
+                    | BinaryOp::And
+                    | BinaryOp::Or => {
                         expr.ty = Some(lhs_ty.clone());
                     } // TODO: support other binary operations
                 }
@@ -1112,6 +1121,9 @@ mod tests {
         let eq_expr = Expr::binary(BinaryOp::Eq, expr1.clone(), expr1.clone());
         let ne_expr = Expr::binary(BinaryOp::Ne, expr1.clone(), expr2.clone());
 
+        let and_expr = Expr::binary(BinaryOp::And, expr1.clone(), expr2.clone());
+        let or_expr = Expr::binary(BinaryOp::Or, expr1.clone(), expr2.clone());
+
         let add_result = add_expr.try_fold(&SymbolTable::default()).unwrap();
         assert_eq!(add_result, ComptimeVal::int(var1 + var2));
 
@@ -1144,6 +1156,12 @@ mod tests {
 
         let ne_result = ne_expr.try_fold(&SymbolTable::default()).unwrap();
         assert_eq!(ne_result, ComptimeVal::bool(var1 != var2));
+
+        let and_result = and_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(and_result, ComptimeVal::bool(var1 != 0 && var2 != 0));
+
+        let or_result = or_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(or_result, ComptimeVal::bool(var1 != 0 || var2 != 0));
 
         // Test unary operation
         let neg_expr = Expr::unary(UnaryOp::Neg, expr1);
