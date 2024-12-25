@@ -247,6 +247,7 @@ pub enum BinaryOp {
     Sub,
     Mul,
     Div,
+    Mod,
 }
 
 /// Unary operators.
@@ -258,7 +259,7 @@ pub enum UnaryOp {
 }
 
 /// Function call.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuncCall {
     pub ident: String,
     pub args: Vec<Expr>,
@@ -268,12 +269,12 @@ pub struct FuncCall {
 /// Left value refers to a specific memory location, typically allowing it to be
 /// assigned a value.
 /// Its usually on the left side of an assignment.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LVal {
     pub ident: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExprKind {
     /// Constant value.
     Const(ComptimeVal),
@@ -290,7 +291,7 @@ pub enum ExprKind {
 }
 
 /// Expression.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expr {
     /// kind of the expression.
     pub kind: ExprKind,
@@ -838,6 +839,7 @@ impl Expr {
                     Bo::Sub => Some(lhs - rhs),
                     Bo::Mul => Some(lhs * rhs),
                     Bo::Div => Some(lhs / rhs),
+                    Bo::Mod => Some(lhs % rhs),
                 }
             }
             ExprKind::Unary(op, expr) => {
@@ -922,7 +924,11 @@ impl Expr {
                 // Create the binary expression
                 let mut expr = Expr::binary(op, lhs, rhs);
                 match op {
-                    BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div => {
+                    BinaryOp::Add
+                    | BinaryOp::Sub
+                    | BinaryOp::Mul
+                    | BinaryOp::Div
+                    | BinaryOp::Mod => {
                         expr.ty = Some(lhs_ty.clone());
                     } // TODO: support other binary operations
                 }
@@ -1016,5 +1022,136 @@ impl Expr {
         }
 
         expr
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_comptime_val_operations() {
+        // Happy path tests
+        let val_int = ComptimeVal::int(10);
+        let val_true = ComptimeVal::bool(true);
+        let val_false = ComptimeVal::bool(false);
+        let val_undef = ComptimeVal::undef(Type::int());
+
+        // Test unwrap_int for Int
+        assert_eq!(val_int.unwrap_int(), 10);
+
+        // Test unwrap_int for Bool
+        assert_eq!(val_true.unwrap_int(), 1);
+
+        // Test is_zero
+        assert!(!val_int.is_zero());
+        assert!(!val_true.is_zero());
+        assert!(!val_undef.is_zero());
+
+        // Test logical_or
+        let or_result = val_true.logical_or(&val_false);
+        assert_eq!(or_result, ComptimeVal::bool(true));
+
+        // Test logical_and
+        let and_result = val_true.logical_and(&val_false);
+        assert_eq!(and_result, ComptimeVal::bool(false));
+
+        // Test addition
+        let add_result = val_int + ComptimeVal::int(5);
+        assert_eq!(add_result, ComptimeVal::int(15));
+
+        // Test panic on operations with Undef
+        let panic_add = std::panic::catch_unwind(|| {
+            let _ = val_undef + ComptimeVal::int(5);
+        });
+        assert!(panic_add.is_err());
+    }
+
+    #[test]
+    fn test_expr_operations() {
+        // Happy path for expressions
+        let expr1 = Expr::const_(ComptimeVal::int(5));
+        let expr2 = Expr::const_(ComptimeVal::int(10));
+
+        let binary_expr = Expr::binary(BinaryOp::Add, expr1.clone(), expr2.clone());
+        let result = binary_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(result, ComptimeVal::int(15));
+
+        // Test unary operation
+        let neg_expr = Expr::unary(UnaryOp::Neg, expr1);
+        let neg_result = neg_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(neg_result, ComptimeVal::int(-5));
+    }
+
+    #[test]
+    fn test_type_checking() {
+        // Basic type check
+        let symtable = &mut SymbolTable::default();
+        symtable.enter_scope();
+        symtable.insert("x", SymbolEntry::from_ty(Type::int()));
+
+        let expr = Expr::lval(LVal {
+            ident: "x".to_string(),
+        });
+        // expect: None
+        let typed_expr = expr.clone().type_check(None, symtable);
+        assert!(typed_expr.ty().is_int());
+        // expect: bool, int to bool
+        let typed_expr = expr.clone().type_check(Some(&Type::bool()), symtable);
+        assert!(typed_expr.ty().is_bool());
+        // expect: int, int to int
+        let typed_expr = expr.clone().type_check(Some(&Type::int()), symtable);
+        assert!(typed_expr.ty().is_int());
+
+        // Test for undefined variable
+        let expr_undefined = Expr::lval(LVal {
+            ident: "y".to_string(),
+        });
+        let panic_type_check = std::panic::catch_unwind(|| {
+            expr_undefined.type_check(None, symtable);
+        });
+        assert!(panic_type_check.is_err());
+
+        symtable.leave_scope();
+    }
+
+    /*
+    {
+        int a;
+        // lookup a
+        {  // inter_scope
+            bool b;
+            // lookup b, a
+            // insert c to upper scope
+        }  // leave_scope
+        // lookup a, b
+    }
+     */
+
+    #[test]
+    fn test_symbol_table() {
+        let mut symtable = SymbolTable::default();
+        symtable.enter_scope();
+
+        // Insert a variable
+        symtable.insert("a", SymbolEntry::from_ty(Type::int()));
+        assert!(symtable.lookup("a").is_some());
+
+        // lookup_mut
+        assert!(symtable.lookup_mut("a").is_some());
+
+        // Lookup variable in nested scope
+        symtable.enter_scope();
+        symtable.insert("b", SymbolEntry::from_ty(Type::bool()));
+        // insert_upper
+        symtable.insert_upper("c", SymbolEntry::from_ty(Type::int()), 1);
+        assert!(symtable.lookup("a").is_some());
+        assert!(symtable.lookup("b").is_some());
+        assert!(symtable.lookup("c").is_some());
+
+        symtable.leave_scope();
+        assert!(symtable.lookup("a").is_some());
+        assert!(symtable.lookup("b").is_none());
+        assert!(symtable.lookup("c").is_some());
     }
 }

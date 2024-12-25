@@ -151,6 +151,7 @@ pub MulExp: Expr = {
   <lhs: MulExp> "*" <rhs: UnaryExp> => Expr::binary(BinaryOp::Mul, lhs, rhs),
   <lhs: MulExp> "/" <rhs: UnaryExp> => Expr::binary(BinaryOp::Div, lhs, rhs),
   // TODO: Support modulo operator
+  <lhs: MulExp> "%" <rhs: UnaryExp> => Expr::binary(BinaryOp::Mod, lhs, rhs),
 }
 
 // AddExp -> MulExp | AddExp ('+' | '−') MulExp

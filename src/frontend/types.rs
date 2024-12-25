@@ -141,4 +141,48 @@ mod tests {
         assert_eq!(Type::bool().to_string(), "bool");
         assert_eq!(Type::int().to_string(), "int");
     }
+
+    #[test]
+    fn test_type_creation() {
+        let void_type = Type::void();
+        let bool_type = Type::bool();
+        let int_type = Type::int();
+
+        assert!(void_type.is_void());
+        assert!(bool_type.is_bool());
+        assert!(int_type.is_int());
+    }
+
+    #[test]
+    fn test_function_type() {
+        let return_type = Type::int();
+        let param_types = vec![Type::bool(), Type::int()];
+        let func_type = Type::func(param_types.clone(), return_type.clone());
+
+        let (params, ret) = func_type.unwrap_func();
+        assert_eq!(params.to_vec(), param_types);
+        assert_eq!(*ret, return_type);
+    }
+
+    #[test]
+    #[should_panic(expected = "unwrap_func: not a function type")]
+    fn test_unwrap_func_panic() {
+        let int_type = Type::int();
+        int_type.unwrap_func();
+    }
+
+    #[test]
+    fn test_bytewidth() {
+        assert_eq!(Type::void().bytewidth(), 0);
+        assert_eq!(Type::bool().bytewidth(), 1);
+        assert_eq!(Type::int().bytewidth(), 4);
+    }
+
+    #[test]
+    fn test_singleton_type_creation() {
+        let int_type1 = Type::int();
+        let int_type2 = Type::int();
+
+        assert!(Rc::ptr_eq(&int_type1.0, &int_type2.0));
+    }
 }
