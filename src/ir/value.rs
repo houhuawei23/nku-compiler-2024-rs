@@ -129,7 +129,7 @@ pub struct DisplayValue<'ctx> {
     with_type: bool,
 }
 
-impl<'ctx> fmt::Display for DisplayValue<'ctx> {
+impl fmt::Display for DisplayValue<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.value.try_deref(self.ctx).unwrap().kind {
             ValueKind::InstResult { ty, .. } | ValueKind::Param { ty, .. } => {

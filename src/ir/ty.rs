@@ -12,6 +12,10 @@ pub enum TyData {
     Int8,
     /// The `i32` type.
     Int32,
+    /// The `f32` type.
+    Float32,
+    /// The `f64` type.
+    Float64,
     /// The pointer type.
     Ptr,
     /// The array type.
@@ -32,13 +36,15 @@ pub struct DisplayTy<'ctx> {
     ty: Ty,
 }
 
-impl<'ctx> std::fmt::Display for DisplayTy<'ctx> {
+impl std::fmt::Display for DisplayTy<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.ty.try_deref(self.ctx).unwrap() {
             TyData::Void => write!(f, "void"),
             TyData::Int1 => write!(f, "i1"),
             TyData::Int8 => write!(f, "i8"),
             TyData::Int32 => write!(f, "i32"),
+            TyData::Float32 => write!(f, "f32"),
+            TyData::Float64 => write!(f, "f64"),
             TyData::Ptr => write!(f, "ptr"),
             TyData::Array { elem, len } => write!(
                 f,
@@ -78,6 +84,20 @@ impl Ty {
         matches!(self.try_deref(ctx).unwrap(), TyData::Void)
     }
 
+    pub fn is_integer(&self, ctx: &Context) -> bool {
+        matches!(
+            self.try_deref(ctx).unwrap(),
+            TyData::Int1 | TyData::Int8 | TyData::Int32
+        )
+    }
+
+    pub fn is_float(&self, ctx: &Context) -> bool {
+        matches!(
+            self.try_deref(ctx).unwrap(),
+            TyData::Float32 | TyData::Float64
+        )
+    }
+
     /// Get the bit width of the type.
     pub fn bitwidth(&self, ctx: &Context) -> usize {
         match self.try_deref(ctx).unwrap() {
@@ -85,6 +105,8 @@ impl Ty {
             TyData::Int1 => 1,
             TyData::Int8 => 8,
             TyData::Int32 => 32,
+            TyData::Float32 => 32,
+            TyData::Float64 => 64,
             TyData::Ptr => ctx.target.ptr_size as usize * 8,
             TyData::Array { elem, len } => elem.bitwidth(ctx) * len,
         }

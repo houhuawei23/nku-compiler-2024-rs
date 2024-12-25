@@ -15,6 +15,8 @@ pub enum IntCmpCond {
     Ne,
     Slt,
     Sle,
+    Sgt,
+    Sge,
 }
 
 impl fmt::Display for IntCmpCond {
@@ -24,6 +26,8 @@ impl fmt::Display for IntCmpCond {
             IntCmpCond::Ne => write!(f, "ne"),
             IntCmpCond::Slt => write!(f, "slt"),
             IntCmpCond::Sle => write!(f, "sle"),
+            IntCmpCond::Sgt => write!(f, "sgt"),
+            IntCmpCond::Sge => write!(f, "sge"),
         }
     }
 }
@@ -338,15 +342,13 @@ impl Inst {
         inst
     }
 
-    /// Create a new `add` instruction.
-    pub fn add(ctx: &mut Context, lhs: Value, rhs: Value, ty: Ty) -> Self {
-        let inst = Self::new(
-            ctx,
-            InstKind::IntBinary {
-                op: IntBinaryOp::Add,
-            },
-            ty,
-        );
+    pub fn ibinary(ctx: &mut Context, op: IntBinaryOp, lhs: Value, rhs: Value) -> Self {
+        if !lhs.ty(ctx).is_integer(ctx) || !rhs.ty(ctx).is_integer(ctx) {
+            panic!("int binary operation with non-integer operands");
+        }
+
+        let ty = lhs.ty(ctx);
+        let inst = Self::new(ctx, InstKind::IntBinary { op }, ty);
         inst.add_operand(ctx, lhs);
         inst.add_operand(ctx, rhs);
         inst
@@ -640,5 +642,47 @@ impl LinkedListNode for Inst {
 
     fn set_container(self, ctx: &mut Self::Ctx, container: Option<Self::Container>) {
         self.deref_mut(ctx).container = container;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Context, Ty, Value, *};
+
+    #[test]
+    fn test_inst_alloca() {
+        let mut ctx = Context::default();
+        let ty = Ty::i32(&mut ctx);
+        let inst = Inst::alloca(&mut ctx, ty);
+
+        assert!(matches!(inst.kind(&ctx), InstKind::Alloca { .. }));
+    }
+
+    #[test]
+    fn test_inst_load() {
+        let mut ctx = Context::default();
+        let ty = Ty::i32(&mut ctx);
+        let ptr = Value::global_ref(&mut ctx, "global".to_string(), ty);
+
+        let inst = Inst::load(&mut ctx, ptr, ty);
+        assert!(matches!(inst.kind(&ctx), InstKind::Load));
+        assert_eq!(inst.operand(&ctx, 0), ptr);
+    }
+
+    #[test]
+    fn test_inst_ibinary_add() {
+        let mut ctx = Context::default();
+        let lhs = Value::i32(&mut ctx, 10);
+        let rhs = Value::i32(&mut ctx, 15);
+
+        let inst = Inst::ibinary(&mut ctx, IntBinaryOp::Add, lhs, rhs);
+        assert!(matches!(
+            inst.kind(&ctx),
+            InstKind::IntBinary {
+                op: IntBinaryOp::Add
+            }
+        ));
+        assert_eq!(inst.operand(&ctx, 0), lhs);
+        assert_eq!(inst.operand(&ctx, 1), rhs);
     }
 }

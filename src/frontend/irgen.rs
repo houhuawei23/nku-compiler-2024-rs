@@ -25,7 +25,7 @@ use super::ast::{
 use super::types::{Type, TypeKind as Tk};
 use crate::frontend::ast::{FuncCall, LVal, UnaryOp};
 use crate::infra::linked_list::LinkedListContainer;
-use crate::ir::{Block, ConstantValue, Context, Func, Global, Inst, TargetInfo, Ty, Value};
+use crate::ir::{self, Block, ConstantValue, Context, Func, Global, Inst, TargetInfo, Ty, Value};
 
 /// Generate IR from the AST.
 pub fn irgen(ast: &CompUnit, pointer_width: u8) -> Context {
@@ -125,82 +125,65 @@ impl IrGenContext {
         }
     }
 
+    fn map_int_binary_op(&self, op: &BinaryOp) -> ir::IntBinaryOp {
+        use BinaryOp as Bo;
+        // let ir_int_binary_op =
+        match op {
+            Bo::Add => ir::IntBinaryOp::Add,
+            Bo::Sub => ir::IntBinaryOp::Sub,
+            Bo::Mul => ir::IntBinaryOp::Mul,
+            Bo::Div => ir::IntBinaryOp::SDiv,
+            Bo::Mod => ir::IntBinaryOp::SRem,
+            Bo::Lt => ir::IntBinaryOp::ICmp {
+                cond: ir::IntCmpCond::Slt,
+            },
+            Bo::Gt => ir::IntBinaryOp::ICmp {
+                cond: ir::IntCmpCond::Sgt,
+            },
+            Bo::Le => ir::IntBinaryOp::ICmp {
+                cond: ir::IntCmpCond::Sle,
+            },
+            Bo::Ge => ir::IntBinaryOp::ICmp {
+                cond: ir::IntCmpCond::Sge,
+            },
+            Bo::Eq => ir::IntBinaryOp::ICmp {
+                cond: ir::IntCmpCond::Eq,
+            },
+            Bo::Ne => ir::IntBinaryOp::ICmp {
+                cond: ir::IntCmpCond::Ne,
+            },
+            Bo::And => ir::IntBinaryOp::And,
+            Bo::Or => ir::IntBinaryOp::Or,
+        }
+        // ir_int_binary_op
+    }
+
     // Generate a new local expression in ir given an expression in AST.
     fn gen_local_expr(&mut self, expr: &Expr) -> Option<Value> {
-        use BinaryOp as Bo;
-
         let curr_block = self.curr_block.unwrap();
 
         match &expr.kind {
             // Constants -> generate a local constant value
             ExprKind::Const(v) => Some(self.gen_local_comptime(v)),
             // Binary operations -> generate the operation
-            ExprKind::Binary(op, lhs, rhs) => match op {
-                Bo::Add
-                | Bo::Sub
-                | Bo::Mul
-                | Bo::Div
-                | Bo::Mod
-                | Bo::Lt
-                | Bo::Gt
-                | Bo::Le
-                | Bo::Ge
-                | Bo::Eq
-                | Bo::Ne
-                | Bo::And
-                | Bo::Or => {
-                    let lhs = self.gen_local_expr(lhs).unwrap(); // Generate lhs
-                    let rhs = self.gen_local_expr(rhs).unwrap(); // Generate rhs
+            ExprKind::Binary(op, lhs, rhs) => {
+                let lhs = self.gen_local_expr(lhs).unwrap(); // Generate lhs
+                let rhs = self.gen_local_expr(rhs).unwrap(); // Generate rhs
 
-                    let lhs_ty = lhs.ty(&self.ctx);
+                let lhs_ty = lhs.ty(&self.ctx);
+                let is_float = lhs_ty.is_float(&self.ctx);
 
-                    let inst = match op {
-                        // Generate add instruction
-                        Bo::Add => Inst::add(&mut self.ctx, lhs, rhs, lhs_ty),
-                        // TODO: Implement other binary operations
-                        Bo::Sub => {
-                            todo!("implement sub");
-                        }
-                        Bo::Mul => {
-                            todo!("implement mul");
-                        }
-                        Bo::Div => {
-                            todo!("implement div");
-                        }
-                        Bo::Mod => {
-                            todo!("implement mod");
-                        }
-                        Bo::Lt => {
-                            todo!("implement lt");
-                        }
-                        Bo::Gt => {
-                            todo!("implement gt");
-                        }
-                        Bo::Le => {
-                            todo!("implement lt");
-                        }
-                        Bo::Ge => {
-                            todo!("implement ge");
-                        }
-                        Bo::Eq => {
-                            todo!("implement eq");
-                        }
-                        Bo::Ne => {
-                            todo!("implement ne");
-                        }
-                        Bo::And => {
-                            todo!("implement and");
-                        }
-                        Bo::Or => {
-                            todo!("implement or");
-                        }
-                    };
+                let ir_int_binary_op = self.map_int_binary_op(op);
 
+                if is_float {
+                    todo!("implement float binary!");
+                } else {
+                    let inst = Inst::ibinary(&mut self.ctx, ir_int_binary_op, lhs, rhs);
                     // Push the instruction to the current block
                     curr_block.push_back(&mut self.ctx, inst).unwrap();
                     Some(inst.result(&self.ctx).unwrap())
                 }
-            },
+            }
             // Unary operations -> generate the operation
             ExprKind::Unary(op, _) => match op {
                 // TODO: Implement unary operations
