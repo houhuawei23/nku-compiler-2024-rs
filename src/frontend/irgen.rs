@@ -136,7 +136,17 @@ impl IrGenContext {
             ExprKind::Const(v) => Some(self.gen_local_comptime(v)),
             // Binary operations -> generate the operation
             ExprKind::Binary(op, lhs, rhs) => match op {
-                Bo::Add | Bo::Sub | Bo::Mul | Bo::Div | Bo::Mod => {
+                Bo::Add
+                | Bo::Sub
+                | Bo::Mul
+                | Bo::Div
+                | Bo::Mod
+                | Bo::Lt
+                | Bo::Gt
+                | Bo::Le
+                | Bo::Ge
+                | Bo::Eq
+                | Bo::Ne => {
                     let lhs = self.gen_local_expr(lhs).unwrap(); // Generate lhs
                     let rhs = self.gen_local_expr(rhs).unwrap(); // Generate rhs
 
@@ -157,6 +167,24 @@ impl IrGenContext {
                         }
                         Bo::Mod => {
                             todo!("implement mod");
+                        }
+                        Bo::Lt => {
+                            todo!("implement lt");
+                        }
+                        Bo::Gt => {
+                            todo!("implement gt");
+                        }
+                        Bo::Le => {
+                            todo!("implement lt");
+                        }
+                        Bo::Ge => {
+                            todo!("implement ge");
+                        }
+                        Bo::Eq => {
+                            todo!("implement eq");
+                        }
+                        Bo::Ne => {
+                            todo!("implement ne");
                         }
                     };
 

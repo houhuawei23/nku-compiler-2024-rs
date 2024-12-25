@@ -243,11 +243,17 @@ impl std::ops::Rem for ComptimeVal {
 /// Binary operators.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
+    Add, /* + */
+    Sub, /* - */
+    Mul, /* * */
+    Div, /* / */
+    Mod, /* % */
+    Lt,  /* < */
+    Gt,  /* > */
+    Le,  /* <= */
+    Ge,  /* >= */
+    Eq,  /* == */
+    Ne,  /* != */
 }
 
 /// Unary operators.
@@ -840,6 +846,12 @@ impl Expr {
                     Bo::Mul => Some(lhs * rhs),
                     Bo::Div => Some(lhs / rhs),
                     Bo::Mod => Some(lhs % rhs),
+                    Bo::Lt => Some(ComptimeVal::bool(lhs < rhs)),
+                    Bo::Gt => Some(ComptimeVal::bool(lhs > rhs)),
+                    Bo::Le => Some(ComptimeVal::bool(lhs <= rhs)),
+                    Bo::Ge => Some(ComptimeVal::bool(lhs >= rhs)),
+                    Bo::Eq => Some(ComptimeVal::bool(lhs == rhs)),
+                    Bo::Ne => Some(ComptimeVal::bool(lhs != rhs)),
                 }
             }
             ExprKind::Unary(op, expr) => {
@@ -928,7 +940,13 @@ impl Expr {
                     | BinaryOp::Sub
                     | BinaryOp::Mul
                     | BinaryOp::Div
-                    | BinaryOp::Mod => {
+                    | BinaryOp::Mod
+                    | BinaryOp::Lt
+                    | BinaryOp::Gt
+                    | BinaryOp::Le
+                    | BinaryOp::Ge
+                    | BinaryOp::Eq
+                    | BinaryOp::Ne => {
                         expr.ty = Some(lhs_ty.clone());
                     } // TODO: support other binary operations
                 }
@@ -1030,7 +1048,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_comptime_val_operations() {
+    fn test_ast_comptime_val_operations() {
         // Happy path tests
         let val_int = ComptimeVal::int(10);
         let val_true = ComptimeVal::bool(true);
@@ -1068,23 +1086,73 @@ mod tests {
     }
 
     #[test]
-    fn test_expr_operations() {
+    fn test_ast_expr_operations() {
         // Happy path for expressions
-        let expr1 = Expr::const_(ComptimeVal::int(5));
-        let expr2 = Expr::const_(ComptimeVal::int(10));
 
-        let binary_expr = Expr::binary(BinaryOp::Add, expr1.clone(), expr2.clone());
-        let result = binary_expr.try_fold(&SymbolTable::default()).unwrap();
-        assert_eq!(result, ComptimeVal::int(15));
+        let var1 = 8;
+        let var2 = 5;
+        let expr1 = Expr::const_(ComptimeVal::int(var1));
+        let expr2 = Expr::const_(ComptimeVal::int(var2));
+
+        // Test binary operation
+        // TODO: how to test these exprs in more concise way?
+        let add_expr = Expr::binary(BinaryOp::Add, expr1.clone(), expr2.clone());
+        let sub_expr = Expr::binary(BinaryOp::Sub, expr1.clone(), expr2.clone());
+
+        let mul_expr = Expr::binary(BinaryOp::Mul, expr1.clone(), expr2.clone());
+        let div_expr = Expr::binary(BinaryOp::Div, expr1.clone(), expr2.clone());
+
+        let mod_expr = Expr::binary(BinaryOp::Mod, expr1.clone(), expr2.clone());
+
+        let lt_expr = Expr::binary(BinaryOp::Lt, expr1.clone(), expr2.clone());
+        let gt_expr = Expr::binary(BinaryOp::Gt, expr1.clone(), expr2.clone());
+        let le_expr = Expr::binary(BinaryOp::Le, expr1.clone(), expr2.clone());
+        let ge_expr = Expr::binary(BinaryOp::Ge, expr1.clone(), expr2.clone());
+
+        let eq_expr = Expr::binary(BinaryOp::Eq, expr1.clone(), expr1.clone());
+        let ne_expr = Expr::binary(BinaryOp::Ne, expr1.clone(), expr2.clone());
+
+        let add_result = add_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(add_result, ComptimeVal::int(var1 + var2));
+
+        let sub_result = sub_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(sub_result, ComptimeVal::int(var1 - var2));
+
+        let mul_result = mul_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(mul_result, ComptimeVal::int(var1 * var2));
+
+        let div_result = div_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(div_result, ComptimeVal::int(var1 / var2));
+
+        let mod_result = mod_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(mod_result, ComptimeVal::int(var1 % var2));
+
+        let lt_result = lt_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(lt_result, ComptimeVal::bool(var1 < var2));
+
+        let gt_result = gt_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(gt_result, ComptimeVal::bool(var1 > var2));
+
+        let le_result = le_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(le_result, ComptimeVal::bool(var1 <= var2));
+
+        let ge_result = ge_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(ge_result, ComptimeVal::bool(var1 >= var2));
+
+        let eq_result = eq_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(eq_result, ComptimeVal::bool(var1 == var1));
+
+        let ne_result = ne_expr.try_fold(&SymbolTable::default()).unwrap();
+        assert_eq!(ne_result, ComptimeVal::bool(var1 != var2));
 
         // Test unary operation
         let neg_expr = Expr::unary(UnaryOp::Neg, expr1);
         let neg_result = neg_expr.try_fold(&SymbolTable::default()).unwrap();
-        assert_eq!(neg_result, ComptimeVal::int(-5));
+        assert_eq!(neg_result, ComptimeVal::int(-8));
     }
 
     #[test]
-    fn test_type_checking() {
+    fn test_ast_type_checking() {
         // Basic type check
         let symtable = &mut SymbolTable::default();
         symtable.enter_scope();
@@ -1129,7 +1197,7 @@ mod tests {
      */
 
     #[test]
-    fn test_symbol_table() {
+    fn test_ast_symbol_table() {
         let mut symtable = SymbolTable::default();
         symtable.enter_scope();
 

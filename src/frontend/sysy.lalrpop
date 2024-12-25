@@ -165,12 +165,18 @@ pub AddExp: Expr = {
 pub RelExp: Expr = {
   AddExp => <>,
   // TODO: Suppoert relational operators
+  <lhs: RelExp> "<" <rhs: AddExp> => Expr::binary(BinaryOp::Lt, lhs, rhs),
+  <lhs: RelExp> ">" <rhs: AddExp> => Expr::binary(BinaryOp::Gt, lhs, rhs),
+  <lhs: RelExp> "<=" <rhs: AddExp> => Expr::binary(BinaryOp::Le, lhs, rhs),
+  <lhs: RelExp> ">=" <rhs: AddExp> => Expr::binary(BinaryOp::Ge, lhs, rhs),
 }
 
 // EqExp -> RelExp | EqExp ('==' | '!=') RelExp
 pub EqExp: Expr = {
   RelExp => <>,
   // TODO: Support equality operators
+  <lhs: EqExp> "==" <rhs: RelExp> => Expr::binary(BinaryOp::Eq, lhs, rhs),
+  <lhs: EqExp> "!=" <rhs: RelExp> => Expr::binary(BinaryOp::Ne, lhs, rhs),
 }
 
 // LAndExp -> EqExp | LAndExp '&&' EqExp
